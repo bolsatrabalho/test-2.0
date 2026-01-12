@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Sistema de Frequência de Bolsistas</title>
+
+<style>
+body { font-family: Arial; background:#f4f6f8; padding:20px; }
+.container { background:#fff; padding:20px; border-radius:8px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th,td { border:1px solid #ccc; padding:6px; text-align:center; }
+th { background:#eee; }
+input,select { width:100%; font-size:12px; }
+button { padding:6px 12px; margin:4px; background:#0057b8; color:#fff; border:none; border-radius:5px; cursor:pointer; }
+button:hover { background:#004494; }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h2>Sistema de Frequência de Bolsistas</h2>
+
+<button onclick="adicionar()">➕ Adicionar bolsista</button>
+<button onclick="salvar()">💾 Salvar</button>
+<button onclick="enviar()">📤 Enviar planilha</button>
+
+<table>
+<thead>
+<tr>
+<th>Campus</th><th>Nome</th><th>Matrícula</th><th>Setor</th>
+<th>Email Coordenador</th><th>Vigência Início</th><th>Vigência Fim</th>
+<th>Jan</th><th>Fev</th><th>Mar</th><th>Abr</th>
+<th>Mai</th><th>Jun</th><th>Jul</th><th>Ago</th>
+<th>Set</th><th>Out</th><th>Nov</th><th>Dez</th>
+<th>Justificativa</th><th>Arquivo</th><th>Ações</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+
+</div>
+
+<script>
+const URL_APPS = "https://script.google.com/macros/s/AKfycbwwl6i89bMXh8TNd3Kk7iFzZuUcwOdqzLKqZ5geg2r7FIurKOoj102twjhSlXDRpsw7Fw/exec";
+
+var dados = JSON.parse(localStorage.getItem("bolsistas")) || [];
+var meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+function salvar(){
+    localStorage.setItem("bolsistas", JSON.stringify(dados));
+    alert("Dados salvos localmente");
+}
+
+function adicionar(){
+    dados.push({
+        campus:"", nome:"", matricula:"", setor:"",
+        coordenador:"", inicio:"", fim:"",
+        meses:Array(12).fill(""),
+        justificativa:"", arquivoBase64:"", arquivoNome:""
+    });
+    render();
+}
+
+function remover(i){
+    if(confirm("Remover bolsista?")){
+        dados.splice(i,1);
+        render();
+    }
+}
+
+function render(){
+    var tbody = document.getElementById("tbody");
+    tbody.innerHTML = "";
+
+    dados.forEach(function(b,i){
+        var tr = document.createElement("tr");
+
+        function tdInput(valor, campo){
+            var td = document.createElement("td");
+            var inp = document.createElement("input");
+            inp.value = valor;
+            inp.onchange = function(){ dados[i][campo]=this.value; };
+            td.appendChild(inp);
+            return td;
+        }
+
+        tr.appendChild(tdInput(b.campus,"campus"));
+        tr.appendChild(tdInput(b.nome,"nome"));
+        tr.appendChild(tdInput(b.matricula,"matricula"));
+        tr.appendChild(tdInput(b.setor,"setor"));
+        tr.appendChild(tdInput(b.coordenador,"coordenador"));
+
+        var tdIni = document.createElement("td");
+        var ini = document.createElement("input");
+        ini.type="date"; ini.value=b.inicio;
+        ini.onchange=function(){dados[i].inicio=this.value};
+        tdIni.appendChild(ini);
+        tr.appendChild(tdIni);
+
+        var tdFim = document.createElement("td");
+        var fim = document.createElement("input");
+        fim.type="date"; fim.value=b.fim;
+        fim.onchange=function(){dados[i].fim=this.value};
+        tdFim.appendChild(fim);
+        tr.appendChild(tdFim);
+
+        meses.forEach(function(_,mi){
+            var td = document.createElement("td");
+            var sel = document.createElement("select");
+            ["","SIM","NÃO"].forEach(function(v){
+                var o = document.createElement("option");
+                o.value=v; o.text=v;
+                if(b.meses[mi]===v) o.selected=true;
+                sel.appendChild(o);
+            });
+            sel.onchange=function(){dados[i].meses[mi]=this.value};
+            td.appendChild(sel);
+            tr.appendChild(td);
+        });
+
+        tr.appendChild(tdInput(b.justificativa,"justificativa"));
+
+        var tdArq = document.createElement("td");
+        var file = document.createElement("input");
+        file.type="file";
+        file.onchange=function(e){upload(e,i)};
+        tdArq.appendChild(file);
+        tr.appendChild(tdArq);
+
+        var tdAc = document.createElement("td");
+        var btn = document.createElement("button");
+        btn.textContent="🗑";
+        btn.onclick=function(){remover(i)};
+        tdAc.appendChild(btn);
+        tr.appendChild(tdAc);
+
+        tbody.appendChild(tr);
+    });
+}
+
+function upload(e,i){
+    var file = e.target.files[0];
+    if(!file) return;
+    var r = new FileReader();
+    r.onload=function(){
+        dados[i].arquivoBase64 = r.result.split(",")[1];
+        dados[i].arquivoNome = file.name;
+    };
+    r.readAsDataURL(file);
+}
+
+function enviar(){
+    var envio = dados.map(function(b){
+        return {
+            campus:b.campus, nome:b.nome, matricula:b.matricula, setor:b.setor,
+            coordenador:b.coordenador, vigenciaInicio:b.inicio, vigenciaFim:b.fim,
+            jan:b.meses[0], fev:b.meses[1], mar:b.meses[2], abr:b.meses[3],
+            mai:b.meses[4], jun:b.meses[5], jul:b.meses[6], ago:b.meses[7],
+            set:b.meses[8], out:b.meses[9], nov:b.meses[10], dez:b.meses[11],
+            justificativa:b.justificativa,
+            arquivoNome:b.arquivoNome,
+            arquivoBase64:b.arquivoBase64
+        };
+    });
+
+    fetch(URL_APPS,{method:"POST", body:JSON.stringify(envio)})
+    .then(r=>r.json())
+    .then(r=>alert(r.status==="ok"?"Enviado com sucesso":"Erro: "+r.mensagem))
+    .catch(()=>alert("Erro de conexão"));
+}
+
+render();
+</script>
+</body>
+</html>
